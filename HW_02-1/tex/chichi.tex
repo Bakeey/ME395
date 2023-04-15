@@ -1,0 +1,85 @@
+% !TEX root = ./main.tex
+We get the displacement signal for the chichi earthquake:
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{chichi_displacement.pdf}
+    \caption{Chichi Earthquake Displacement Profile}
+\end{figure}
+
+Next, we get the velocity profile using a differentiation filter. 
+We use the forward difference (Euler forward) and central difference filter and can compare these two
+methods to the given velocity measurement signal in figure \ref{chichi_velocity}. 
+
+\begin{figure}
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{chichi_velocity.pdf}
+    \caption{Chichi earthquake velocity, measurement and computed via filter.}
+    \label{chichi_velocity}
+\end{figure}
+
+We see that the computed velocity signal seems to be generally in agreement with the measured velocity
+signal, and plot the difference of the computed signal (differentiated from displacement using filter) 
+to the measured signal in figure \ref{chichi_velocity_error}. 
+Unsurprisingly, central difference is more accurate than forward difference.
+
+\begin{figure}
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{chichi_velocity_error.pdf}
+    \caption{Chichi earthquake velocity error, comparing computed velocity differentiated from 
+             displacement to measurmeent velocity.}
+    \label{chichi_velocity_error}
+\end{figure}
+
+\clearpage
+Lastly, we can derive the acceleration signal by differentiating again. 
+
+First, we perform differentiation using the central difference method on the velocity data 
+computed from the displacement profile using central difference.
+
+Secondly, we perform backward difference on the forward-difference velocity profile.
+
+Third, we obtain the acceleration profile directly from the displacement measurement using second-order 
+finite difference:
+
+\begin{equation}
+    \frac{d^2 u}{d t^2}\left(t_j\right)=\frac{u\left(t_{j+1}\right)-2 u\left(t_j\right)+u\left(t_{j-1}\right)}{\left(t_j-t_{j-1}\right)^2}
+    \label{eq:1}
+\end{equation}
+
+We plot all of thse derived acceleration signals in figure \ref{chichi_acceleration}. 
+Similarly to figure \ref{chichi_velocity_error}, compare the computed acceleration signal to the given 
+acceleration measurement in figure \ref{chichi_acceleration_error}.
+
+We notice that the acceleration error for the signal using backwards differentiation is the same as for the 2nd 
+order central difference method. This is because as seen in the handwritten homework, performing differentiation twice 
+using forward and backward difference yields the same result as the 2nd order central difference method seen in equation \ref{eq:1}.
+
+Lastly, we see that performing first order central difference twice to receive a second order derivative 
+results in a larger error. This is because since approximating the 1st order derivative via central differences can be written as
+$$
+u^{\prime}(x) \approx \frac{u(t_{j+1})-u(t_{j-1})}{(t_{j+1}-t_{j-1})}
+$$
+What is the main issue with applying again a central difference to compute $u^{\prime \prime}(t_j)$ is:
+$$
+\frac{d u^\prime}{dt}(x)=\frac{u^{\prime}(t_{j+1})-u^{\prime}(t_{j-1})}{(t_{j+1}-t_{j-1})} \approx \frac{u\left(t_{j+2}\right)-2 u\left(t_j\right)+u\left(t_{j-2}\right)}{(t_{j+1}-t_{j-1})^2}
+$$
+Which is less accurate than applying forward and backward difference!
+
+
+\newpage
+
+\begin{figure}
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{chichi_acceleration.pdf}
+    \caption{Chichi earthquake acceleration, measurement and computed via filter.}
+    \label{chichi_acceleration}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{chichi_acceleration_error.pdf}
+    \caption{Chichi earthquake acceleration error, comparing computed acceleration to measurmeent acceleration.}
+    \label{chichi_acceleration_error}
+\end{figure}
+\clearpage

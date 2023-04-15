@@ -1,0 +1,55 @@
+% !TEX root = ./main.tex
+We again get the displacement signal, this time for the imperial earthquake.
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{imperial_displacement.pdf}
+    \caption{Imperial Earthquake Displacement Profile}
+\end{figure}
+
+Next, we get the velocity profile using a differentiation filter. 
+
+In general, the procedure is the same as for the Chichi earthquake.
+
+We use the forward difference (Euler forward) and central difference filter in figure \ref{imperial_velocity}.
+
+\begin{figure}
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{imperial_velocity.pdf}
+    \caption{Imperial earthquake velocity, computed via filter.}
+    \label{imperial_velocity}
+\end{figure}
+
+We see that the computed velocity signals seem to be generall in agreement. Now, we can derive the acceleration signal by differentiating again. 
+
+First, we perform differentiation using the central difference method on the velocity data 
+computed from the displacement profile using central difference.
+
+Secondly, we perform backward difference on the forward difference velocity profile.
+
+Third, we obtain the acceleration profile directly from the displacement measurement using second-order 
+finite difference. The results can be seen in figure \ref{imperial_acceleration}
+
+\begin{figure}
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{imperial_acceleration.pdf}
+    \caption{Imperial earthquake acceleration, computed via filter.}
+    \label{imperial_acceleration}
+\end{figure}
+
+\clearpage
+Lastly, we can plot the difference between the acceleration derived by differentiation from the velocity 
+profiles to the one directly differentiated from the displacement profile. We can again see that there is no 
+difference between taking forward and backward difference to taking second order central difference directly 
+(apart from the edges, due to padding).
+
+We can also again see that applying first-order central difference is less accurate.
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics*[width=0.75\columnwidth]{imperial_accelertion_diff.pdf}
+    \caption{Chichi earthquake acceleration error, comparing computed acceleration to measurmeent acceleration.}
+    \label{imperial_acceleration_error}
+\end{figure}
+\clearpage
