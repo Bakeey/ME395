@@ -23,7 +23,7 @@ def OurModel(input_shape, output_shape):
     X = Dense(64, activation="relu", kernel_initializer='he_uniform')(X)
 
     # Output Layer with 1 node (RUL)
-    X = Dense(output_shape, activation="linear", kernel_initializer='he_uniform')(X)
+    X = Dense(output_shape, activation="relu", kernel_initializer='he_uniform')(X)
 
     model = Model(inputs = X_input, outputs = X, name='DQN_model')
     model.compile(loss="mse", optimizer=rmsprop_v2.RMSProp(learning_rate=0.00025, rho=0.95, epsilon=0.01), metrics=["accuracy"])
@@ -49,23 +49,50 @@ class NNAgent:
         n = int(mean_sample_time**2 / (mean_sample_time - stdv_sample_time))
         p = (1-stdv_sample_time/mean_sample_time)
 
-        for epoch in range(self.no_epochs):
-            train_data = np.empty((101,2*len(self.features)))
-            target = np.empty((101,1))
-            for engine in range(1,101):
-                T = np.random.binomial(n,p)
+        for epoch in range(self.no_epochs): # TODO Make Training Data larger???
+            train_data = np.empty((self.training_data['unit_number'].max(),2*len(self.features)))
+            target = np.empty((self.training_data['unit_number'].max(),1))
+            for engine in range(1,self.training_data['unit_number'].max() + 1):
+                T = np.clip(np.random.binomial(n,p), 1, \
+                            self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
 
-                # Sample from trainingdata here!!!!
+                # TODO How to sample?
 
+                T = np.random.randint(1, \
+                            self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
+
+                train_data[engine - 1, :len(self.features)] = self.training_data.loc[ 
+                    (self.training_data['unit_number']==engine) &\
+                    (self.training_data['time']==T), self.features].to_numpy()
                 
+                train_data[engine - 1, len(self.features):] = self.training_data.loc[ 
+                    (self.training_data['unit_number']==engine) &\
+                    (self.training_data['time']==1), self.features].to_numpy()
+                
+                target[engine - 1] = self.training_data.loc[ 
+                    (self.training_data['unit_number']==engine) &\
+                    (self.training_data['time']==T), 'RUL'].to_numpy()
+                
+            self.model.fit(train_data, target, validation_split = 0.2, batch_size=25, epochs = 15, verbose=1)
 
-        ## PUT FEATURES HERE!!!
+            print("Hi")
 
-                feature_vector = np.zeros((1,2*len(self.features)))
-                target = np.zeros((1,1))
-                self.model.fit(feature_vector, target, batch_size=1, verbose=1)
-    
-    # check keras for engineers
+    def predict(self): # TODO predit better? How many epochs?
+        feature_vector = np.empty((self.testing_data['unit_number'].max(),2*len(self.features)))
+
+        for engine in range(1, self.testing_data['unit_number'].max() + 1):
+            max_time = self.testing_data.loc[ 
+                    (self.testing_data['unit_number']==engine), 'time'].max()
+            feature_vector[engine - 1, :len(self.features)] = self.testing_data.loc[ 
+                    (self.testing_data['unit_number']==engine) &\
+                    (self.testing_data['time']==1), self.features].to_numpy()
+            feature_vector[engine - 1, len(self.features):] = self.testing_data.loc[ 
+                    (self.testing_data['unit_number']==engine) &\
+                    (self.testing_data['time']==max_time), self.features].to_numpy()
+            
+        self.model.predict(feature_vector)
+            
+        return self.model.predict(feature_vector)
 
 
 def main() -> None:
@@ -80,7 +107,7 @@ def main() -> None:
     
     agent = NNAgent(training_data, testing_data, target_values, features)
     agent.train()
-
+    result = agent.predict()
 
     return
 
