@@ -14,16 +14,18 @@ def OurModel(input_shape, output_shape):
 
     # 'Dense' is the basic form of a neural network layer
     # Input Layer of state size(4) and Hidden Layer with 512 nodes
-    X = Dense(512, input_shape=input_shape, activation="relu", kernel_initializer='he_uniform')(X_input)
+    X = Dense(512, input_shape=input_shape, activation="relu")(X_input)
+
+    X = Dense(512, activation="exponential")(X)
 
     # Hidden layer with 256 nodes
-    X = Dense(256, activation="relu", kernel_initializer='he_uniform')(X)
+    X = Dense(256, activation="relu")(X)
     
     # Hidden layer with 64 nodes
-    X = Dense(64, activation="relu", kernel_initializer='he_uniform')(X)
+    X = Dense(64, activation="relu")(X)
 
     # Output Layer with 1 node (RUL)
-    X = Dense(output_shape, activation="relu", kernel_initializer='he_uniform')(X)
+    X = Dense(output_shape, activation="relu")(X)
 
     model = Model(inputs = X_input, outputs = X, name='DQN_model')
     model.compile(loss="mse", optimizer=rmsprop_v2.RMSProp(learning_rate=0.00025, rho=0.95, epsilon=0.01), metrics=["accuracy"])
@@ -32,7 +34,7 @@ def OurModel(input_shape, output_shape):
     return model
 
 class NNAgent:
-    def __init__(self, training_data, testing_data, target_values, features, epochs: int = 1000, learning_rate = 0.1):
+    def __init__(self, training_data, testing_data, target_values, features, epochs: int = 10, learning_rate = 0.1):
         self.training_data = training_data
         self.testing_data = testing_data
         self.target_values = target_values
@@ -73,7 +75,7 @@ class NNAgent:
                     (self.training_data['unit_number']==engine) &\
                     (self.training_data['time']==T), 'RUL'].to_numpy()
                 
-            self.model.fit(train_data, target, validation_split = 0.2, batch_size=25, epochs = 15, verbose=1)
+            self.model.fit(train_data, target, validation_split = 0.5, batch_size=25, epochs = 150, verbose=1)
 
             print("Hi")
 
