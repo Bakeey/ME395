@@ -30,7 +30,7 @@ def OurModel(input_shape, output_shape):
     X = Dense(output_shape, activation="relu")(X)
 
     model = Model(inputs = X_input, outputs = X, name='DQN_model')
-    model.compile(loss="mse", optimizer=rmsprop_v2.RMSProp(learning_rate=0.0005, rho=0.95, epsilon=0.01), metrics=["accuracy"])
+    model.compile(loss="mse", optimizer=rmsprop_v2.RMSProp(learning_rate=0.00025, rho=0.95, epsilon=0.01), metrics=["mean_absolute_error"])
 
     model.summary()
     return model
@@ -46,63 +46,60 @@ class NNAgent:
         # create main model
         self.model = OurModel(input_shape=(4*len(features),), output_shape=1)
 
-    def train(self):
-        mean_sample_time = self.testing_data.groupby('unit_number')['time'].max().mean()
-        stdv_sample_time = self.testing_data.groupby('unit_number')['time'].max().std()
+    def generate_features(self, dataset, training_size: int = 1000, testing: bool = False):
+        if not testing:
+            mean_sample_time = self.testing_data.groupby('unit_number')['time'].max().mean()
+            stdv_sample_time = self.testing_data.groupby('unit_number')['time'].max().std()
 
-        n = int(mean_sample_time**2 / (mean_sample_time - stdv_sample_time))
-        p = (1-stdv_sample_time/mean_sample_time)
+            n = int(mean_sample_time**2 / (mean_sample_time - stdv_sample_time))
+            p = (1-stdv_sample_time/mean_sample_time)
 
-        for epoch in range(self.no_epochs): # TODO Make Training Data larger???
-            train_data = np.empty((self.training_data['unit_number'].max(),4*len(self.features)))
-            target = np.empty((self.training_data['unit_number'].max(),1))
-            for engine in range(1,self.training_data['unit_number'].max() + 1):
+            feature_vector = np.empty((training_size,4*len(self.features)))
+            engine_numbers = np.random.randint(1,self.training_data['unit_number'].max() + 1, (training_size,))
+
+            target_vector = np.empty((training_size,1))
+        
+        else:
+            engine_numbers = np.arange(1,self.testing_data['unit_number'].max() + 1)
+            feature_vector = np.empty((self.testing_data['unit_number'].max(),4*len(self.features)))
+            target_vector = None
+
+        for idx,engine in enumerate(engine_numbers):
+            if not testing:
                 T = np.clip(np.random.binomial(n,p), 1, \
-                            self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
-
-                # TODO How to sample?
-
-                T = np.random.randint(1, \
-                            self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
-
-                train_data[engine - 1, :len(self.features)] = self.training_data.loc[ 
-                    (self.training_data['unit_number']==engine) &\
-                    (self.training_data['time']==T), self.features].to_numpy()
+                        self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
                 
-                train_data[engine - 1, len(self.features):2*len(self.features)] = self.training_data.loc[ 
-                    (self.training_data['unit_number']==engine) &\
-                    (self.training_data['time']==1), self.features].to_numpy()
-                
-                train_data[engine - 1, 2*len(self.features):3*len(self.features)] = self.training_data.loc[ 
-                    self.training_data['unit_number']==engine, self.features].mean().to_numpy()
-                
-                train_data[engine - 1, 3*len(self.features):4*len(self.features)] = self.training_data.loc[ 
-                    self.training_data['unit_number']==engine, self.features].median().to_numpy()
-                
-                target[engine - 1] = self.training_data.loc[ 
+                target_vector[idx] = self.training_data.loc[ 
                     (self.training_data['unit_number']==engine) &\
                     (self.training_data['time']==T), 'RUL'].to_numpy()
-                
-            self.model.fit(train_data, target, validation_split = 0.2, batch_size=25, epochs = 1500, verbose=1)
+                # T = np.random.randint(1, \
+                #         self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
+            else:
+                T = self.testing_data.loc[(self.testing_data['unit_number']==engine), 'time'].max()
 
+            feature_vector[idx, :len(self.features)] = dataset.loc[ 
+                (dataset['unit_number']==engine) & (dataset['time']==T), self.features].to_numpy()
+            
+            feature_vector[idx, len(self.features):2*len(self.features)] = dataset.loc[ 
+                (dataset['unit_number']==engine) & (dataset['time']==1), self.features].to_numpy()
+            
+            feature_vector[idx, 2*len(self.features):3*len(self.features)] = dataset.loc[ 
+                dataset['unit_number']==engine, self.features].mean().to_numpy()
+            
+            feature_vector[idx, 3*len(self.features):4*len(self.features)] = dataset.loc[ 
+                dataset['unit_number']==engine, self.features].median().to_numpy()
+            
+        return feature_vector, target_vector
+        
+                
+    def train(self):
+        train_data, target = self.generate_features(self.training_data)
+        self.model.fit(train_data, target, validation_split = 0.25, batch_size=250, epochs = 100, verbose=1)
         return
 
-    def predict(self): # TODO predit better? How many epochs?
-        feature_vector = np.empty((self.testing_data['unit_number'].max(),4*len(self.features)))
 
-        for engine in range(1, self.testing_data['unit_number'].max() + 1):
-            max_time = self.testing_data.loc[ 
-                    (self.testing_data['unit_number']==engine), 'time'].max()
-            feature_vector[engine - 1, :len(self.features)] = self.testing_data.loc[ 
-                    (self.testing_data['unit_number']==engine) &\
-                    (self.testing_data['time']==1), self.features].to_numpy()
-            feature_vector[engine - 1, len(self.features):2*len(self.features)] = self.testing_data.loc[ 
-                    (self.testing_data['unit_number']==engine) &\
-                    (self.testing_data['time']==max_time), self.features].to_numpy()
-            feature_vector[engine - 1, 2*len(self.features):3*len(self.features)] = self.testing_data.loc[ 
-                self.training_data['unit_number']==engine, self.features].mean().to_numpy()
-            feature_vector[engine - 1, 3*len(self.features):4*len(self.features)] = self.testing_data.loc[ 
-                    self.training_data['unit_number']==engine, self.features].median().to_numpy()
+    def predict(self): # TODO predit better? How many epochs?
+        feature_vector, _ = self.generate_features(self.testing_data, testing=True)
             
         prediction = self.model.predict(feature_vector)
             
