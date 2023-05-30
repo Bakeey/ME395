@@ -1,9 +1,12 @@
 import numpy as np
 import pandas as pd
 
+import matplotlib.pyplot as plt
+
 from keras.layers import Input, Dense
 from keras.optimizers import rmsprop_v2
 from keras.models import Model, load_model
+from keras import regularizers
 
 from data.preprocessing import load_data
 from data.preprocessing import preprocessing
@@ -14,20 +17,43 @@ def OurModel(input_shape, output_shape):
 
     # 'Dense' is the basic form of a neural network layer
     # Input Layer of state size(4) and Hidden Layer with 512 nodes
-    X = Dense(512, input_shape=input_shape, activation="linear")(X_input)
+    X = Dense(1024, input_shape=input_shape, activation="linear",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X_input)
 
-    X = Dense(512, activation="exponential")(X)
+    X = Dense(1024, activation="exponential",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X)
 
-    X = Dense(512, activation="relu")(X)
+    X = Dense(1024, activation="relu",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X)
+
+    X = Dense(512, activation="relu",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X)
 
     # Hidden layer with 256 nodes
-    X = Dense(256, activation="relu")(X)
+    X = Dense(256, activation="relu",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X)
     
     # Hidden layer with 64 nodes
-    X = Dense(64, activation="relu")(X)
+    X = Dense(64, activation="relu",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X)
 
     # Output Layer with 1 node (RUL)
-    X = Dense(output_shape, activation="relu")(X)
+    X = Dense(output_shape, activation="relu",
+            kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
+            bias_regularizer=regularizers.L2(1e-4),
+            activity_regularizer=regularizers.L2(1e-5))(X)
 
     model = Model(inputs = X_input, outputs = X, name='DQN_model')
     model.compile(loss="mse", optimizer=rmsprop_v2.RMSProp(learning_rate=0.00025, rho=0.95, epsilon=0.01), metrics=["mean_absolute_error"])
@@ -46,13 +72,22 @@ class NNAgent:
         # create main model
         self.model = OurModel(input_shape=(4*len(features),), output_shape=1)
 
-    def generate_features(self, dataset, training_size: int = 1000, testing: bool = False):
+    def generate_features(self, dataset, training_size: int = 500, testing: bool = False):
         if not testing:
-            mean_sample_time = self.testing_data.groupby('unit_number')['time'].max().mean()
-            stdv_sample_time = self.testing_data.groupby('unit_number')['time'].max().std()
+            mean_sample_time = self.target_values.mean() # self.testing_data.groupby('unit_number')['time'].max().mean()
+            stdv_sample_time = self.target_values.std() # self.testing_data.groupby('unit_number')['time'].max().std()
+
+            max_sample_time = self.target_values.max() # self.testing_data.groupby('unit_number')['time'].max().mean()
+            min_sample_time = self.target_values.min() # self.testing_data.groupby('unit_number')['time'].max().std()
+
+            mean_start_time = self.testing_data.groupby('unit_number')['time'].max().mean()
+            stdv_start_time = self.testing_data.groupby('unit_number')['time'].max().std()
 
             n = int(mean_sample_time**2 / (mean_sample_time - stdv_sample_time))
-            p = (1-stdv_sample_time/mean_sample_time)
+            p = float(1-stdv_sample_time/mean_sample_time)
+
+            n_2 = int(mean_start_time**2 / (mean_start_time - stdv_start_time))
+            p_2 = float(1-stdv_start_time/mean_start_time)
 
             feature_vector = np.empty((training_size,4*len(self.features)))
             engine_numbers = np.random.randint(1,self.training_data['unit_number'].max() + 1, (training_size,))
@@ -66,22 +101,30 @@ class NNAgent:
 
         for idx,engine in enumerate(engine_numbers):
             if not testing:
-                T = np.clip(np.random.binomial(n,p), 1, \
-                        self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
+                timeseries_length = self.training_data.loc[self.training_data['unit_number']==engine]['time'].max()
+                T_end = int(np.clip(timeseries_length - np.random.randint(min_sample_time, max_sample_time), 1, \
+                        timeseries_length))
+                
+                T_start = np.clip(T_end - np.random.binomial(n_2,p_2), 1, \
+                        T_end)
+                
+                mean_start_time = self.testing_data.groupby('unit_number')['time'].max().mean()
+                stdv_start_time = self.testing_data.groupby('unit_number')['time'].max().std()
                 
                 target_vector[idx] = self.training_data.loc[ 
                     (self.training_data['unit_number']==engine) &\
-                    (self.training_data['time']==T), 'RUL'].to_numpy()
+                    (self.training_data['time']==T_end), 'RUL'].to_numpy()
                 # T = np.random.randint(1, \
                 #         self.training_data.loc[self.training_data['unit_number']==engine]['time'].max())
             else:
-                T = self.testing_data.loc[(self.testing_data['unit_number']==engine), 'time'].max()
+                T_end = self.testing_data.loc[(self.testing_data['unit_number']==engine), 'time'].max()
+                T_start = 1
 
             feature_vector[idx, :len(self.features)] = dataset.loc[ 
-                (dataset['unit_number']==engine) & (dataset['time']==T), self.features].to_numpy()
+                (dataset['unit_number']==engine) & (dataset['time']==T_end), self.features].to_numpy()
             
             feature_vector[idx, len(self.features):2*len(self.features)] = dataset.loc[ 
-                (dataset['unit_number']==engine) & (dataset['time']==1), self.features].to_numpy()
+                (dataset['unit_number']==engine) & (dataset['time']==T_start), self.features].to_numpy()
             
             feature_vector[idx, 2*len(self.features):3*len(self.features)] = dataset.loc[ 
                 dataset['unit_number']==engine, self.features].mean().to_numpy()
@@ -94,14 +137,38 @@ class NNAgent:
                 
     def train(self):
         train_data, target = self.generate_features(self.training_data)
-        self.model.fit(train_data, target, validation_split = 0.25, batch_size=250, epochs = 100, verbose=1)
+        self.model.fit(train_data, target, validation_split = 0.25, batch_size=25, epochs = 10, verbose=1)
         return
 
 
     def predict(self): # TODO predit better? How many epochs?
+        # TODO 
+        # MAKE TRAINING DATA MORE LIKE TESTING DATA, BUT HOWW????
         feature_vector, _ = self.generate_features(self.testing_data, testing=True)
             
         prediction = self.model.predict(feature_vector)
+
+        mean_abs_error = np.mean(np.abs(prediction - self.target_values))
+
+        target = self.target_values.to_numpy().reshape(100,)
+        prediction = prediction.reshape(100,)
+        indexes = np.argsort(target)
+        prediction = [prediction[ii] for ii in indexes]
+        target = [target[ii] for ii in indexes]
+
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+        x = np.arange(100)
+        bar_width = 0.4
+        b1 = ax.bar(x, prediction,
+                    width=bar_width)
+        b2 = ax.bar(x + bar_width,target,
+                    width=bar_width)
+
+        # Fix the x-axes.
+        ax.set_xticks(x + bar_width / 2)
+        ax.set_xticklabels(np.arange(1,101))
+
             
         return prediction
 
