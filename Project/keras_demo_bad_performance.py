@@ -23,7 +23,7 @@ def OurModel(input_shape, output_shape):
             bias_regularizer=regularizers.L2(1e-4),
             activity_regularizer=regularizers.L2(1e-5))(X_input)
 
-    X = Dense(1024, activation="exponential",
+    X = Dense(1024, activation="relu",
             kernel_regularizer=regularizers.L1L2(l1=1e-5, l2=1e-4),
             bias_regularizer=regularizers.L2(1e-4),
             activity_regularizer=regularizers.L2(1e-5))(X)
@@ -72,7 +72,7 @@ class NNAgent:
         self.training_size = training_size
 
         # create main model
-        self.model = OurModel(input_shape=(4*len(features),), output_shape=1)
+        self.model = OurModel(input_shape=(2*len(features),), output_shape=1)
 
     def generate_features(self, dataset, training_size: int = None, testing: bool = False):
         if training_size is None:
@@ -94,14 +94,14 @@ class NNAgent:
             n_2 = int(mean_start_time**2 / (mean_start_time - stdv_start_time))
             p_2 = float(1-stdv_start_time/mean_start_time)
 
-            feature_vector = np.empty((training_size,4*len(self.features)))
+            feature_vector = np.empty((training_size,2*len(self.features)))
             engine_numbers = np.random.randint(1,self.training_data['unit_number'].max() + 1, (training_size,))
 
             target_vector = np.empty((training_size,1))
         
         else:
             engine_numbers = np.arange(1,self.testing_data['unit_number'].max() + 1)
-            feature_vector = np.empty((self.testing_data['unit_number'].max(),4*len(self.features)))
+            feature_vector = np.empty((self.testing_data['unit_number'].max(),2*len(self.features)))
             target_vector = None
 
         for idx,engine in enumerate(engine_numbers):
@@ -131,14 +131,15 @@ class NNAgent:
             feature_vector[idx, len(self.features):2*len(self.features)] = dataset.loc[ 
                 (dataset['unit_number']==engine) & (dataset['time']==T_start), self.features].to_numpy()
             
-            feature_vector[idx, 2*len(self.features):3*len(self.features)] = dataset.loc[ 
-                dataset['unit_number']==engine, self.features].mean().to_numpy()
-            
-            feature_vector[idx, 3*len(self.features):4*len(self.features)] = dataset.loc[ 
-                dataset['unit_number']==engine, self.features].median().to_numpy()
-            
+            # feature_vector[idx, 2*len(self.features):3*len(self.features)] = dataset.loc[ 
+            #     dataset['unit_number']==engine, self.features].mean().to_numpy()
+            # 
+            # feature_vector[idx, 3*len(self.features):4*len(self.features)] = dataset.loc[ 
+            #     dataset['unit_number']==engine, self.features].median().to_numpy()
+            # 
         return feature_vector, target_vector
         
+             
                 
     def train(self):
         train_data, target = self.generate_features(self.training_data)
@@ -184,7 +185,6 @@ class NNAgent:
         ax.set_title(r'no_epochs = '+str(self.no_epochs)+r', training data size = '+str(self.training_size))
         # fig.show()
 
-
             
         return prediction, mean_abs_error
 
@@ -199,8 +199,8 @@ def main() -> None:
     else:
         training_data, testing_data, target_values, features = load_data()
     
-    epochs = [10,20,50,100,200,500]
-    training_size = [100,500,1000,5000]
+    epochs = [100] # [10,20,50,100,200,500]
+    training_size = [500] #  [100,500,1000,5000]
 
     result = np.empty((len(epochs),len(training_size),))
     mean_abs_error = np.empty((len(epochs),len(training_size)))
